@@ -5,7 +5,7 @@
 #define MEMORYSTREAM_WITH_SPAN_SUPPORT
 #endif
 
-namespace CryptoHives.Memory.Buffers;
+namespace CryptoHives.Foundation.Memory.Buffers;
 
 using System;
 using System.Buffers;
@@ -80,6 +80,7 @@ public sealed class ReadOnlySequenceMemoryStream : MemoryStream
                 // end of stream.
                 return -1;
             }
+
         } while (true);
     }
 
@@ -158,7 +159,7 @@ public sealed class ReadOnlySequenceMemoryStream : MemoryStream
     /// <inheritdoc/>
     public void Write(ReadOnlySpan<byte> buffer)
     {
-        throw new NotSupportedException();
+        throw new NotSupportedException("Writing to a ReadOnlySequence is not supported.");
     }
 #endif
 
@@ -252,13 +253,18 @@ public sealed class ReadOnlySequenceMemoryStream : MemoryStream
     /// <summary>
     /// Returns the offset of a <paramref name="position" /> within this sequence from the start.
     /// </summary>
-    /// <param name="position">The <see cref="System.SequencePosition"/> of which to get the offset.</param>
+    /// <remarks>
+    /// Function is not supported by System.Memory for older .NET versions, so the function is 
+    /// copied from here https://source.dot.net/#System.Memory/System/Buffers/ReadOnlySequence.cs,532.
+    /// </remarks>
+    /// <param name="position">The <see cref="SequencePosition"/> of which to get the offset.</param>
     /// <returns>The offset from the start of the sequence.</returns>
-    /// <exception cref="System.ArgumentOutOfRangeException">The position is out of range.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The position is out of range.</exception>
     private long GetOffset(SequencePosition position)
     {
         object? positionSequenceObject = position.GetObject();
         bool positionIsNull = positionSequenceObject == null;
+
         // TODO: Implement a BoundsCheck for SequencePosition
         //BoundsCheck(position, !positionIsNull);
 
@@ -292,17 +298,14 @@ public sealed class ReadOnlySequenceMemoryStream : MemoryStream
             }
 
             // Multi-Segment Sequence
-            ReadOnlySequenceSegment<byte>? currentSegment = (ReadOnlySequenceSegment<byte>?)startObject;
+            var currentSegment = (ReadOnlySequenceSegment<byte>?)startObject;
             while (currentSegment != null && currentSegment != positionSequenceObject)
             {
                 currentSegment = currentSegment.Next!;
             }
 
             // Hit the end of the segments but didn't find the segment
-            if (currentSegment is null)
-            {
-                throw new ArgumentOutOfRangeException();
-            }
+            if (currentSegment is null) throw new ArgumentOutOfRangeException();
 
             Debug.Assert(currentSegment!.RunningIndex + positionIndex >= 0);
 

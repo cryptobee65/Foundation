@@ -5,7 +5,7 @@
 #define MEMORYSTREAM_WITH_SPAN_SUPPORT
 #endif
 
-namespace CryptoHives.Memory.Buffers;
+namespace CryptoHives.Foundation.Memory.Buffers;
 
 using System;
 using System.Buffers;
@@ -293,10 +293,7 @@ public sealed class ArrayPoolMemoryStream : MemoryStream
                 throw new IOException("Invalid seek origin value.");
         }
 
-        if (offset < 0)
-        {
-            throw new IOException("Cannot seek beyond the beginning of the stream.");
-        }
+        if (offset < 0) throw new IOException("Cannot seek beyond the beginning of the stream.");
 
         // special case
         if (offset == 0)

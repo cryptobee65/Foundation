@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
 // SPDX-License-Identifier: MIT
 
-namespace CryptoHives.Memory.Buffers;
+namespace CryptoHives.Foundation.Memory.Buffers;
 
 using System;
 using System.Buffers;
@@ -9,7 +9,7 @@ using System.Buffers;
 /// <summary>
 /// A class to hold a sequence of ArrayPool buffers in a <see cref="ReadOnlySequence{T}"/> until disposed.
 /// </summary>
-public sealed class ArrayPoolBufferSequence<T> : IDisposable
+internal sealed class ArrayPoolBufferSequence<T> : IDisposable
 {
     private ArrayPoolBufferSegment<T>? _firstSegment;
     private ReadOnlySequence<T> _sequence;
