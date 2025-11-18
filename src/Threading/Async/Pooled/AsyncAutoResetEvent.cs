@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
 // SPDX-License-Identifier: MIT
 
-namespace CryptoHives.Foundation.Threading.Async;
+namespace CryptoHives.Foundation.Threading.Async.Pooled;
 
 using CryptoHives.Foundation.Threading.Pools;
 using System;
@@ -17,20 +17,45 @@ using System.Threading.Tasks.Sources;
 /// poolable <see cref="PooledManualResetValueTaskSource{Boolean}"/> to avoid allocations
 /// of <see cref="TaskCompletionSource{Boolean}"/> and <see cref="Task"/>.
 /// </summary>
-public class PooledAsyncAutoResetEvent
+public class AsyncAutoResetEvent
 {
-    private readonly Queue<PooledManualResetValueTaskSource<bool>> _waiters = new(PooledEventsCommon.DefaultEventQueueSize);
-    private int _signaled;
+    private readonly Queue<ManualResetValueTaskSource<bool>> _waiters = new(PooledEventsCommon.DefaultEventQueueSize);
+    private readonly LocalManualResetValueTaskSource<bool> _localWaiter = new();
+#if NET9_0_OR_GREATER
+    private readonly Lock _mutex = new();
+#else
+    private readonly object _mutex = new();
+#endif
+    private volatile int _signaled;
+    private bool _runContinuationAsynchronously;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PooledAsyncAutoResetEvent"/>
+    /// Initializes a new instance of the <see cref="AsyncAutoResetEvent"/>
     /// class with the specified initial state.
     /// </summary>
-    /// <param name="initialState">A boolean value indicating the initial state of the event. <see langword="true"/> if the event is initially
-    /// signaled; otherwise, <see langword="false"/>.</param>
-    public PooledAsyncAutoResetEvent(bool initialState = false)
+    /// <param name="initialState">The initial state of the event.</param>
+    /// <param name="runContinuationAsynchronously">Indicates if continuations are forced to run asynchronously.</param>
+    public AsyncAutoResetEvent(bool initialState = false, bool runContinuationAsynchronously = true)
     {
         _signaled = initialState ? 1 : 0;
+        _runContinuationAsynchronously = runContinuationAsynchronously;
+    }
+
+    /// <summary>
+    /// Whether this event is currently set.
+    /// </summary>
+    public bool IsSet
+    {
+        get { lock (_mutex) return _signaled != 0; }
+    }
+
+    /// <summary>
+    /// Gets or sets whether to force continuations to run asynchronously.
+    /// </summary>
+    public bool RunContinuationAsynchronously
+    {
+        get { return _runContinuationAsynchronously; }
+        set { _runContinuationAsynchronously = value; }
     }
 
     /// <summary>
@@ -42,7 +67,7 @@ public class PooledAsyncAutoResetEvent
     /// The ValueTask is a struct that can only be awaited or transformed with AsTask() ONE time, then
     /// it is returned to the pool and every subsequent access throws an <see cref="InvalidOperationException"/>.
     /// <code>
-    ///     var event = new PooledAsyncAutoResetEvent();
+    ///     var event = new AsyncAutoResetEvent();
     ///     
     ///     // GOOD: single await
     ///     await _event.WaitAsync().ConfigureAwait(false);
@@ -73,18 +98,24 @@ public class PooledAsyncAutoResetEvent
         // fast path without lock
         if (Interlocked.Exchange(ref _signaled, 0) != 0)
         {
-            return PooledEventsCommon.CompletedTask;
+            return default;
         }
 
-        lock (_waiters)
+        lock (_mutex)
         {
-            // due to race conditions, _signalled may have changed
+            // due to race conditions, _signalled may have changed until the lock is taken
             if (Interlocked.Exchange(ref _signaled, 0) != 0)
             {
-                return PooledEventsCommon.CompletedTask;
+                return default;
             }
 
-            PooledManualResetValueTaskSource<bool> waiter = PooledEventsCommon.GetPooledValueTaskSource();
+            ManualResetValueTaskSource<bool> waiter;
+            if (!_localWaiter.TryGetValueTaskSource(out waiter))
+            {
+                waiter = PooledEventsCommon.GetPooledValueTaskSource();
+            }
+
+            waiter.RunContinuationsAsynchronously = _runContinuationAsynchronously;
             _waiters.Enqueue(waiter);
             return new ValueTask(waiter, waiter.Version);
         }
@@ -109,9 +140,9 @@ public class PooledAsyncAutoResetEvent
     /// </remarks>
     public void Set()
     {
-        PooledManualResetValueTaskSource<bool>? toRelease;
+        ManualResetValueTaskSource<bool>? toRelease;
 
-        lock (_waiters)
+        lock (_mutex)
         {
             if (_waiters.Count == 0)
             {
@@ -126,14 +157,22 @@ public class PooledAsyncAutoResetEvent
     }
 
     /// <summary>
+    /// Reset the signaled state for test purposes.
+    /// </summary>
+    internal void Reset()
+    {
+        Interlocked.Exchange(ref _signaled, 0);
+    }
+
+    /// <summary>
     /// Signals all waiting tasks to complete successfully.
     /// </summary>
     public void SetAll()
     {
         int count;
-        PooledManualResetValueTaskSource<bool>[]? toRelease;
+        ManualResetValueTaskSource<bool>[]? toRelease;
 
-        lock (_waiters)
+        lock (_mutex)
         {
             count = _waiters.Count;
             if (count == 0)
@@ -142,7 +181,7 @@ public class PooledAsyncAutoResetEvent
                 return;
             }
 
-            toRelease = ArrayPool<PooledManualResetValueTaskSource<bool>>.Shared.Rent(count);
+            toRelease = ArrayPool<ManualResetValueTaskSource<bool>>.Shared.Rent(count);
             for (int i = 0; i < count; i++)
             {
                 toRelease[i] = _waiters.Dequeue();
@@ -153,7 +192,7 @@ public class PooledAsyncAutoResetEvent
 
         try
         {
-            PooledManualResetValueTaskSource<bool> waiter;
+            ManualResetValueTaskSource<bool> waiter;
             for (int i = 0; i < count; i++)
             {
                 waiter = toRelease[i];
@@ -162,7 +201,7 @@ public class PooledAsyncAutoResetEvent
         }
         finally
         {
-            ArrayPool<PooledManualResetValueTaskSource<bool>>.Shared.Return(toRelease);
+            ArrayPool<ManualResetValueTaskSource<bool>>.Shared.Return(toRelease);
         }
     }
 }

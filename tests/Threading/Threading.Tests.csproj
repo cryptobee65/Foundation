@@ -4,8 +4,9 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>Threading.Tests</AssemblyName>
     <TargetFrameworks>$(TestsTargetFrameworks)</TargetFrameworks>
-    <RootNamespace>$(AssemblyPrefix).$(AssemblyName)</RootNamespace>
+    <RootNamespace>$(AssemblyName)</RootNamespace>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <NoWarn>$(NoWarn);NUnit1028</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,10 +38,10 @@
 
   <ItemGroup>
     <PackageReference Condition="'$(SignAssembly)' != 'true'" Include="Nito.AsyncEx" />
+    <PackageReference Include="AsyncKeyedLock" />    
   </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\..\src\Threading\Threading.csproj" />
   </ItemGroup>
-
 </Project>

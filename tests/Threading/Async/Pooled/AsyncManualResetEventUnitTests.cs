@@ -1,20 +1,20 @@
 // SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
 // SPDX-License-Identifier: MIT
 
-namespace CryptoHives.Foundation.Threading.Tests.Async;
+namespace Threading.Tests.Async.Pooled;
 
-using CryptoHives.Foundation.Threading.Async;
+using CryptoHives.Foundation.Threading.Async.Pooled;
 using NUnit.Framework;
 using System.Linq;
 using System.Threading.Tasks;
 
 [TestFixture]
-public class PooledAsyncManualResetEventUnitTests
+public class AsyncManualResetEventUnitTests
 {
     [Test]
     public async Task WaitAsyncUnsetIsNotCompletedAsync()
     {
-        var mre = new PooledAsyncManualResetEvent();
+        var mre = new AsyncManualResetEvent();
 
         Task task = mre.WaitAsync().AsTask();
 
@@ -24,7 +24,7 @@ public class PooledAsyncManualResetEventUnitTests
     [Test]
     public void WaitAsyncValueTaskAfterSetCompletesSynchronously()
     {
-        var mre = new PooledAsyncManualResetEvent();
+        var mre = new AsyncManualResetEvent();
 
         mre.Set();
         ValueTask task = mre.WaitAsync();
@@ -35,7 +35,7 @@ public class PooledAsyncManualResetEventUnitTests
     [Test]
     public void WaitAsyncTaskAfterSetCompletesSynchronously()
     {
-        var mre = new PooledAsyncManualResetEvent();
+        var mre = new AsyncManualResetEvent();
 
         mre.Set();
         Task task = mre.WaitAsync().AsTask();
@@ -46,7 +46,7 @@ public class PooledAsyncManualResetEventUnitTests
     [Test]
     public void WaitAsyncSetCompletesSynchronously()
     {
-        var mre = new PooledAsyncManualResetEvent(true);
+        var mre = new AsyncManualResetEvent(true);
 
         ValueTask task = mre.WaitAsync();
 
@@ -56,7 +56,7 @@ public class PooledAsyncManualResetEventUnitTests
     [Test]
     public async Task MultipleWaitersAfterSetAllCompleteAsync()
     {
-        var mre = new PooledAsyncManualResetEvent();
+        var mre = new AsyncManualResetEvent();
 
         Task t1 = mre.WaitAsync().AsTask();
         Task t2 = mre.WaitAsync().AsTask();
@@ -65,15 +65,18 @@ public class PooledAsyncManualResetEventUnitTests
 
         // both should complete because ManualResetEvent stays signaled
         await Task.WhenAll(t1, t2).ConfigureAwait(false);
-        Assert.That(t1.IsCompleted);
-        Assert.That(t2.IsCompleted);
-        Assert.That(mre.IsSet);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(t1.IsCompleted);
+            Assert.That(t2.IsCompleted);
+            Assert.That(mre.IsSet);
+        }
     }
 
     [Test]
     public async Task MultipleWaitersValueTaskAndTaskCompleteAfterSetAsync()
     {
-        var mre = new PooledAsyncManualResetEvent();
+        var mre = new AsyncManualResetEvent();
 
         // create several waiters using ValueTask and Task forms
         Task[] taskWaiters = Enumerable.Range(0,5).Select(_ => mre.WaitAsync().AsTask()).ToArray();
@@ -87,15 +90,18 @@ public class PooledAsyncManualResetEventUnitTests
         // await waiters
         await Task.WhenAll(taskWaiters).ConfigureAwait(false);
 
-        // verify all completed and event remains set
-        Assert.That(taskWaiters.All(t => t.IsCompleted));
-        Assert.That(mre.IsSet);
+        using (Assert.EnterMultipleScope())
+        {
+            // verify all completed and event remains set
+            Assert.That(taskWaiters.All(t => t.IsCompleted));
+            Assert.That(mre.IsSet);
+        }
     }
 
     [Test]
     public async Task ResetUnsetsEventAsync()
     {
-        var mre = new PooledAsyncManualResetEvent(true);
+        var mre = new AsyncManualResetEvent(true);
 
         Assert.That(mre.IsSet);
 
@@ -110,7 +116,7 @@ public class PooledAsyncManualResetEventUnitTests
     [Test]
     public async Task ResetWhenAlreadyResetDoesNothingAsync()
     {
-        var mre = new PooledAsyncManualResetEvent(false);
+        var mre = new AsyncManualResetEvent(false);
 
         // Should not throw and should remain unset
         mre.Reset();
@@ -125,9 +131,7 @@ public class PooledAsyncManualResetEventUnitTests
         {
             Task completed = await Task.WhenAny(task, Task.Delay(timeoutMs)).ConfigureAwait(false);
             if (completed == task)
-            {
                 Assert.Fail("Expected task to never complete.");
-            }
         }
     }
 }

@@ -1,9 +1,8 @@
-// SPDX-FileCopyrightText:2025 The Keepers of the CryptoHives
+// SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
 // SPDX-License-Identifier: MIT
 
-namespace CryptoHives.Foundation.Threading.Tests.Pools;
+namespace Threading.Tests.Pools;
 
-using CryptoHives.Foundation.Threading.Async;
 using CryptoHives.Foundation.Threading.Pools;
 using NUnit.Framework;
 using System;
@@ -14,73 +13,84 @@ using System.Threading.Tasks.Sources;
 public class PooledManualResetValueTaskSourceTests
 {
     [Test, CancelAfter(1000)]
-    public async Task ValueTaskCompletesWhenSetResultCalled()
+    public async Task ValueTaskCompletesWhenSetResultCalledAsync()
     {
         PooledManualResetValueTaskSource<bool> vts = PooledEventsCommon.GetPooledValueTaskSource();
 
-        ValueTask<bool> vt = new ValueTask<bool>(vts, vts.Version);
+        var vt = new ValueTask<bool>(vts, vts.Version);
         short version = vts.Version;
 
-        // version matches
-        Assert.That(version, Is.EqualTo(vts.Version));
+        using (Assert.EnterMultipleScope())
+        {
+            // version matches
+            Assert.That(version, Is.EqualTo(vts.Version));
 
-        // not completed yet
-        Assert.That(vt.IsCompleted, Is.False);
+            // not completed yet
+            Assert.That(vt.IsCompleted, Is.False);
+        }
 
         // complete
         vts.SetResult(true);
 
         // now completed
         bool result = await vt.ConfigureAwait(false);
-        Assert.That(result, Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result, Is.True);
 
-        // version has changed
-        Assert.That(version, Is.Not.EqualTo(vts.Version));
+            // version has changed
+            Assert.That(version, Is.Not.EqualTo(vts.Version));
+        }
 
         // calling with old version throws
-        Assert.ThrowsAsync<InvalidOperationException>(async () => await vt.ConfigureAwait(false));
-        Assert.ThrowsAsync<InvalidOperationException>(() => vt.AsTask());
+        _ = Assert.ThrowsAsync<InvalidOperationException>(async () => await vt.ConfigureAwait(false));
+        _ = Assert.ThrowsAsync<InvalidOperationException>(vt.AsTask);
     }
 
     [Test, CancelAfter(1000)]
-    public async Task ValueTaskAsTaskCompletesWhenSetResultCalled()
+    public async Task ValueTaskAsTaskCompletesWhenSetResultCalledAsync()
     {
         PooledManualResetValueTaskSource<bool> vts = PooledEventsCommon.GetPooledValueTaskSource();
 
-        ValueTask<bool> vt = new ValueTask<bool>(vts, vts.Version);
+        var vt = new ValueTask<bool>(vts, vts.Version);
         short version = vts.Version;
 
         Task<bool> t = vt.AsTask();
 
-        // version matches
-        Assert.That(version, Is.EqualTo(vts.Version));
+        using (Assert.EnterMultipleScope())
+        {
+            // version matches
+            Assert.That(version, Is.EqualTo(vts.Version));
 
-        // not completed yet
-        Assert.That(t.IsCompleted, Is.False);
+            // not completed yet
+            Assert.That(t.IsCompleted, Is.False);
+        }
 
         // complete
         vts.SetResult(true);
 
         // now completed
         bool result = await t.ConfigureAwait(false);
-        Assert.That(result, Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result, Is.True);
 
-        // version changed
-        Assert.That(version, Is.Not.EqualTo(vts.Version));
+            // version changed
+            Assert.That(version, Is.Not.EqualTo(vts.Version));
+        }
 
         // calling with old version throws
-        Assert.ThrowsAsync<InvalidOperationException>(async () => await vt.ConfigureAwait(false));
-        Assert.ThrowsAsync<InvalidOperationException>(() => vt.AsTask());
+        _ = Assert.ThrowsAsync<InvalidOperationException>(async () => await vt.ConfigureAwait(false));
+        _ = Assert.ThrowsAsync<InvalidOperationException>(vt.AsTask);
     }
 
     [Test]
-    public async Task OnCompletedInvokesContinuationWhenSignaled()
+    public async Task OnCompletedInvokesContinuationWhenSignaledAsync()
     {
         PooledManualResetValueTaskSource<bool> vts = PooledEventsCommon.GetPooledValueTaskSource();
 
         short token = vts.Version;
         var tcs = new TaskCompletionSource<bool>();
-
 
         // register continuation
         vts.OnCompleted(state => ((TaskCompletionSource<bool>)state!).SetResult(true), tcs, token, ValueTaskSourceOnCompletedFlags.None);
@@ -92,10 +102,11 @@ public class PooledManualResetValueTaskSourceTests
         vts.SetResult(true);
 
         // continuation should run
-        await tcs.Task.ConfigureAwait(false);
+        bool success = await tcs.Task.ConfigureAwait(false);
 
         // status becomes succeeded
         Assert.That(vts.GetStatus(token), Is.EqualTo(ValueTaskSourceStatus.Succeeded));
+        Assert.That(success, Is.True);
     }
 
     [Test]
@@ -111,10 +122,13 @@ public class PooledManualResetValueTaskSourceTests
         bool reset = vts.TryReset();
         short after = vts.Version;
 
-        // reset successful
-        Assert.That(reset, Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            // reset successful
+            Assert.That(reset, Is.True);
 
-        // version has changed
-        Assert.That(after, Is.Not.EqualTo(version));
+            // version has changed
+            Assert.That(after, Is.Not.EqualTo(version));
+        }
     }
 }

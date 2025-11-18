@@ -1,0 +1,173 @@
+// SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
+// SPDX-License-Identifier: MIT
+
+namespace Threading.Tests.Async.Pooled;
+
+using BenchmarkDotNet.Attributes;
+using NUnit.Framework;
+using System.Threading.Tasks;
+
+/// <summary>
+/// Benchmarks measuring single-threaded lock/unlock performance on AsyncLock implementations.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This benchmark suite evaluates the fast-path performance of async locks in uncontended scenarios
+/// where lock acquisition completes immediately without queuing.
+/// </para>
+/// <para>
+/// <b>Test scenario:</b> Repeatedly acquire and immediately release an uncontended lock.
+/// </para>
+/// <para>
+/// <b>Compared implementations:</b>
+/// </para>
+/// <list type="bullet">
+/// <item><description><b>Standard (lock):</b> Synchronous C# lock statement (Monitor-based).</description></item>
+/// <item><description><b>Pooled:</b> Allocation-free async implementation using pooled IValueTaskSource with struct releaser.</description></item>
+/// <item><description><b>Nito.AsyncEx:</b> Third-party async library with Task-based lock and IDisposable releaser.</description></item>
+/// <item><description><b>AsyncKeyedLock (NonKeyed):</b> Third-party high-performance async lock library.</description></item>
+/// <item><description><b>RefImpl (baseline):</b> Reference implementation using TaskCompletionSource and Task.</description></item>
+/// </list>
+/// <para>
+/// <b>Key metrics:</b> Fast-path overhead and memory allocations when no contention exists.
+/// This represents the optimal case for async lock implementations.
+/// </para>
+/// </remarks>
+[TestFixture]
+[MemoryDiagnoser(displayGenColumns: false)]
+[HideColumns("Namespace", "Error", "StdDev", "Median", "RatioSD", "AllocRatio")]
+[Description("Measures the performance of uncontended lock/unlock operations.")]
+[NonParallelizable]
+[BenchmarkCategory("AsyncLock")]
+public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
+{
+    private volatile int _counter;
+
+#if NET9_0_OR_GREATER
+    /// <summary>
+    /// Benchmark for .NET 9.0 C# Lock statement.
+    /// </summary>
+    /// <remarks>
+    /// Measures the baseline performance of the .NET 9 Lock mechanism.
+    /// This is the fastest synchronous option but blocks threads and cannot be used with await.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public void LockUnlockSingle()
+    {
+        lock (Lock)
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+
+    /// <summary>
+    /// Benchmark for .NET 9.0 C# Lock statement with EnterScope().
+    /// </summary>
+    /// <remarks>
+    /// Measures the baseline performance of the .NET 9 Lock mechanism with EnterScope().
+    /// This is the fastest synchronous option but blocks threads and cannot be used with await.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public void LockEnterScopeSingle()
+    {
+        using (Lock.EnterScope())
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+#endif
+
+    /// <summary>
+    /// Benchmark for standard synchronous C# lock statement.
+    /// </summary>
+    /// <remarks>
+    /// Measures the baseline performance of the synchronous Monitor-based lock mechanism.
+    /// This option blocks threads and cannot be used with await.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public void ObjectLockUnlockSingle()
+    {
+        lock (ObjectLock)
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+
+    /// <summary>
+    /// Benchmark for pooled async lock (single uncontended acquisition).
+    /// </summary>
+    /// <remarks>
+    /// Measures the fast-path performance of the allocation-free async lock using pooled IValueTaskSource.
+    /// In the uncontended case, the lock returns a completed ValueTask immediately with no allocations.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public async Task LockUnlockPooledSingleAsync()
+    {
+        using (await LockPooled.LockAsync().ConfigureAwait(false))
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+
+    /// <summary>
+    /// Benchmark for Nito.AsyncEx async lock (single uncontended acquisition).
+    /// </summary>
+    /// <remarks>
+    /// Measures the fast-path performance of the third-party Nito.AsyncEx async lock.
+    /// This implementation uses Task-based primitives.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public async Task LockUnlockNitoSingleAsync()
+    {
+        using (await LockNitoAsync.LockAsync().ConfigureAwait(false))
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+
+    /// <summary>
+    /// Benchmark for AsyncKeyedLock (NonKeyed) async lock (single uncontended acquisition).
+    /// </summary>
+    /// <remarks>
+    /// Measures the fast-path performance of the third-party AsyncKeyedLock library.
+    /// This high-performance library uses ValueTask-based primitives and optimized pooling.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public async Task LockUnlockNonKeyedSingleAsync()
+    {
+        using (await LockNonKeyed.LockAsync().ConfigureAwait(false))
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+
+    /// <summary>
+    /// Benchmark for reference implementation async lock (single uncontended acquisition, baseline).
+    /// </summary>
+    /// <remarks>
+    /// Measures the fast-path performance of the TaskCompletionSource-based reference implementation.
+    /// This serves as the baseline for comparing allocation-free patterns in uncontended scenarios.
+    /// </remarks>
+    [Test]
+    [Benchmark(Baseline = true)]
+    public async Task LockUnlockRefImplSingleAsync()
+    {
+        using (await LockRefImpl.LockAsync().ConfigureAwait(false))
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+}
