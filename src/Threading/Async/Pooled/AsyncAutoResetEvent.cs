@@ -13,10 +13,61 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
 /// <summary>
-/// An async version of <see cref="AutoResetEvent"/> which uses a
-/// poolable <see cref="PooledManualResetValueTaskSource{Boolean}"/> to avoid allocations
-/// of <see cref="TaskCompletionSource{Boolean}"/> and <see cref="Task"/>.
+/// An async version of <see cref="AutoResetEvent"/> which uses a pooled approach
+/// to implement waiters for <see cref="ValueTask"/> to reduce memory allocations.
 /// </summary>
+/// <remarks>
+/// <para>
+/// This implementation uses <see cref="ValueTask"/> for waiters and provides allocation-free 
+/// async signaling by reusing pooled <see cref="IValueTaskSource{T}"/> instances to avoid allocations
+/// of <see cref="TaskCompletionSource{Boolean}"/> and <see cref="Task"/>. As a side effect,
+/// the benchmarks reveal that in many cases performance is also better than other known
+/// implementations.
+/// </para>
+/// <para>
+/// <b>Important Usage Note:</b> Awaiting on <see cref="ValueTask"/> has its own caveats, as it 
+/// is a struct that can only be awaited or converted with AsTask() ONE single time.
+/// Additional attempts to await after the first await or additional conversions to AsTask() will throw 
+/// an <see cref="InvalidOperationException"/>.
+/// </para>
+/// <para>
+/// <b>Continuation Scheduling:</b> The <see cref="RunContinuationAsynchronously"/> property
+/// controls how continuations are executed when the event is signaled. When set to <see langword="true"/>
+/// (default), continuations are forced to queue to the thread pool, preventing the signaling thread from
+/// being blocked by continuation execution. When set to <see langword="false"/>, continuations
+/// may execute synchronously on the signaling thread, reducing context switching overhead but
+/// potentially increasing Set() call duration and could lead to deadlocks because the waiting code
+/// may be executed directly by the signaling thread.
+/// </para>
+/// <para>
+/// <b>Performance Warning - AsTask() Usage:</b> When <see cref="RunContinuationAsynchronously"/>
+/// is <see langword="true"/>, converting the returned <see cref="ValueTask"/> to <see cref="Task"/>
+/// via AsTask() and storing the result before the event is signaled can cause severe performance
+/// degradation (often 10x-100x slower) and additional memory allocations. This is an implementation
+/// detail of the underlying <see cref="ManualResetValueTaskSourceCore{T}"/> which
+/// cannot complete synchronously when a Task wrapper exists before signaling, forcing asynchronous
+/// scheduling even when the event is already signaled.
+/// </para>
+/// <para>
+/// <b>Recommendation:</b> Always await <see cref="ValueTask"/> directly. Avoid conversion 
+/// to <see cref="Task"/> using AsTask(). Avoid storing AsTask() results across signaling boundaries.
+/// When usage of <see cref="Task"/> is mandatory, a native implementation using 
+/// <see cref="TaskCompletionSource{T}"/> should be considered.
+/// </para>
+/// <code>
+/// // GOOD: Direct ValueTask await (optimal performance)
+/// await eventInstance.WaitAsync().ConfigureAwait(false);
+/// 
+/// // SIGH: Immediate AsTask() conversion and await (adds memory allocation, but avoids performance hit)
+/// await eventInstance.WaitAsync().AsTask().ConfigureAwait(false);
+/// 
+/// // BAD: Storing AsTask before signaling (possible severe performance degradation)
+/// Task t = eventInstance.WaitAsync().AsTask();  // Stored before Set()
+/// eventInstance.Set();
+/// ...
+/// await t.ConfigureAwait(false);  // 10x-100x slower due to forced async scheduling AFTER Set()
+/// </code>
+/// </remarks>
 public class AsyncAutoResetEvent
 {
     private readonly Queue<ManualResetValueTaskSource<bool>> _waiters = new(PooledEventsCommon.DefaultEventQueueSize);
@@ -46,12 +97,24 @@ public class AsyncAutoResetEvent
     /// </summary>
     public bool IsSet
     {
-        get { lock (_mutex) return _signaled != 0; }
+        get { return _signaled != 0; }
     }
 
     /// <summary>
     /// Gets or sets whether to force continuations to run asynchronously.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When <see langword="true"/> (default), continuations are queued to the thread pool when the event
+    /// is signaled, preventing the signaling thread from being blocked by continuation execution.
+    /// When <see langword="false"/>, continuations may execute synchronously on the signaling thread.
+    /// </para>
+    /// <para>
+    /// <b>Performance Warning:</b> When this property is <see langword="true"/>, converting <see cref="ValueTask"/>
+    /// to <see cref="Task"/> via AsTask() and storing the result before signaling causes severe performance
+    /// degradation. Always await <see cref="ValueTask"/> directly to avoid this issue.
+    /// </para>
+    /// </remarks>
     public bool RunContinuationAsynchronously
     {
         get { return _runContinuationAsynchronously; }
