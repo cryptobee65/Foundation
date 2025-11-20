@@ -1,25 +1,34 @@
-# 🛡️ CryptoHives Open Source Initiative 🐝
+## 🛡️ CryptoHives Open Source Initiative 🐝
 
-The **CryptoHives Open Source Initiative** brings consistent, portable, and auditable cryptography to .NET — managed code first, OS quirks gone.
+An open, community-driven cryptography and performance library collection for the .NET ecosystem.
 
 ---
 
-# 🐝 CryptoHives Open Source Initiative .NET Foundation Packages
+## 🐝 CryptoHives .NET Foundation Packages
 
-The **CryptoHives Open Source Initiative** is a collection of modern, high-assurance cryptographic libraries for .NET, developed and maintained by **The Keepers of the CryptoHives**. 
-Each package is designed for security, interoperability, and clarity — making it easy to build secure systems without sacrificing developer experience.
-There are also supporting packages which improve memory usage and thread synchronization for high performance transformation pipelines and for cryptography workloads.
+The **CryptoHives Open Source Initiative** is a collection of modern, high-assurance libraries for .NET, developed and maintained by **The Keepers of the CryptoHives**. 
+Each package is designed for security, interoperability, and clarity — making it easy to build secure systems for high performance transformation pipelines and for cryptography workloads without sacrificing developer experience.
+
+---
+
+## 📚 Documentation
+
+📖 **[Full Documentation](https://cryptohives.github.io/Foundation/)** - Comprehensive guides, API reference, and examples
+
+- 🚀 [Getting Started Guide](https://cryptohives.github.io/Foundation/getting-started.html)
+- 📦 [Package Documentation](https://cryptohives.github.io/Foundation/packages/index.html)
+- 📚 [API Reference](https://cryptohives.github.io/Foundation/api/index.html)
 
 ---
 
 ## 📦 Available Packages
 
-| Package | Description | NuGet |
-|----------|--------------|--------|
-| `CryptoHives.Foundation.Memory` | Memory library | [![NuGet](https://img.shields.io/nuget/v/CryptoHives.Foundation.Memory.svg)](https://www.nuget.org/packages/CryptoHives.Foundation.Memory) |
-| `CryptoHives.Foundation.Threading` | Threading library | [![NuGet](https://img.shields.io/nuget/v/CryptoHives.Foundation.Threading.svg)](https://www.nuget.org/packages/CryptoHives.Foundation.Threading) |
+| Package | Description | NuGet | Documentation |
+|----------|--------------|--------|---------------|
+| `CryptoHives.Foundation.Memory` | High-performance pooled buffers and streams | [![NuGet](https://img.shields.io/nuget/v/CryptoHives.Foundation.Memory.svg)](https://www.nuget.org/packages/CryptoHives.Foundation.Memory) | [Docs](https://cryptohives.github.io/Foundation/packages/memory/index.html) |
+| `CryptoHives.Foundation.Threading` | Pooled async synchronization primitives | [![NuGet](https://img.shields.io/nuget/v/CryptoHives.Foundation.Threading.svg)](https://www.nuget.org/packages/CryptoHives.Foundation.Threading) | [Docs](https://cryptohives.github.io/Foundation/packages/threading/index.html) |
 
-More packages are available under the `CryptoHives.*` namespace — see the Nuget [CryptoHives](https://www.nuget.org/packages/CryptoHives) for details.
+More packages will be published under the `CryptoHives.*` namespace — see the Nuget [CryptoHives](https://www.nuget.org/packages?q=CryptoHives) for details.
 
 ### 🐝 CryptoHives Health
 
@@ -30,28 +39,19 @@ More packages are available under the `CryptoHives.*` namespace — see the Nuge
 
 ---
 
-## ✨ Overview
-
-The **CryptoHives .NET Foundation** project serves as the first core building block for .NET libraries under the **CryptoHives Open Source Initiative** umbrella.
-
-All implementations are developed **from first principles**, without reliance on operating system or native platform crypto providers, ensuring:
-
-- 🔒 **Security Transparency** — all algorithms are clean-room verified and auditable 
-- ⚙️ **Predictable Performance** — optimized memory usage and allocation-free APIs 
-- 🧱 **Composable Architecture** — designed for integration in modern .NET applications, from libraries to microservices 
-
----
-
 ## 🧬 Features
 
-### 🔐 Clean-Room Cryptography
+### 📚 API Overview and documentation
+The API reference with samples is available at the [CryptoHives .NET Foundation Docs](https://cryptohives.github.io/Foundation/).
+
+### 🔐 Clean-Room Cryptography (planned)
 - Fully managed implementations of symmetric and asymmetric algorithms
 - No dependency on OS or hardware cryptographic APIs
 - Deterministic behavior across all platforms and runtimes
 - Support for both classical and modern primitives (AES, ChaCha20, SHA-2/3, etc.)
-
+ 
 ### ⚡ High-Performance Primitives
-CryptoHives provides a growing set of utilities designed to optimize high performance transformation pipelines and cryptography workloads:
+- CryptoHives provides a growing set of utilities designed to optimize high performance transformation pipelines and cryptography workloads.
 
 ### 🛠️ Memory Efficiency
 - **ArrayPool-based allocators** for common crypto and serialization scenarios
@@ -59,9 +59,15 @@ CryptoHives provides a growing set of utilities designed to optimize high perfor
 - Primitives to handle ownership of pooled buffers using `ReadOnlySequence<T>` with `ArrayPool<T>`
 - Zero-copy, zero-allocation design for high-frequency cryptographic workloads and transformation pipelines
 
-### 🛠️ Concurrency Tools
+### 🚀 Concurrency Tools
 - Lightweight Async-compatible synchronization primitives based on `ObjectPool` and `ValueTask<T>`
 - High-performance threading helpers designed to reduce allocations of `Task` and `TaskCompletionSource<T>`
+
+### 🧪 Tests and Benchmarks
+- Comprehensive tests and benchmarks are available to evaluate performance across various scenarios.
+
+### 🔒 Fuzzing
+- All libraries and public-facing APIs are planned to be fuzzed (wip)
 
 ---
 
@@ -70,33 +76,59 @@ CryptoHives provides a growing set of utilities designed to optimize high perfor
 Install via NuGet CLI:
 
 ```bash
-dotnet add package CryptoHives.Memory
+dotnet add package CryptoHives.Foundation.Threading
 ```
 
 Or using the Visual Studio Package Manager:
 
 ```powershell
-Install-Package CryptoHives.Memory
+Install-Package CryptoHives.Foundation.Threading
 ```
 
 ---
 
-## 🧠 Usage Example
+## 🧠 Usage Examples
 
-Here’s a minimal example using the `CryptoHives.Memory` package:
+---
+
+Here’s a minimal example using the `CryptoHives.Foundation.Memory` package:
 
 ```csharp
-using CryptoHives.Memory;
+using CryptoHives.Foundation.Memory;
 using System;
 
 public class Example
 {
     public string WritePooledChunk(ReadOnlySpan<byte> chunk)
     {
-        using var writer = new ArrayPoolMemoryStream(defaultBufferSize);
+        // Use a MemoryStream backed by ArrayPool<byte> buffers
+        using var writer = new ArrayPoolMemoryStream();
         writer.Write(chunk);
         ReadOnlySequence<byte> sequence = writer.GetReadOnlySequence();
         return Encoding.UTF8.GetString(sequence);
+    }
+}
+```
+
+---
+
+Here’s a minimal example using the `CryptoHives.Foundation.Threading` package:
+
+```csharp
+using CryptoHives.Foundation.Threading.Async.Pooled;
+using System;
+
+public class Example
+{
+    private AsyncLock _lock = new AsyncLock(); 
+
+    public async Task AccessSharedResourceAsync()
+    {
+        // Due to the use of ValueTask and ObjectPools, 
+        // this mutex is very fast and allocation-efficient
+        // Acquire the lock asynchronously
+        using await _lock.ConfigureAwait(false);
+        // Access shared async resource here
     }
 }
 ```
@@ -146,10 +178,7 @@ By default, packages use the following license tags:
 ```
 
 Some inherited components may use alternative MIT license headers, according to their origin and specific requirements those headers are retained.
-<!--
----
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FCryptoHives%2FFoundation.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FCryptoHives%2FFoundation?ref=badge_large)
--->
+
 ---
 
 ## 🐝 About The Keepers of the CryptoHives
