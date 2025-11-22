@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
 // SPDX-License-Identifier: MIT
 
+#pragma warning disable CA1051  // Do not declare visible instance fields, benchmarks require fastest access
+
 namespace Threading.Tests.Async.Pooled;
 
 using CryptoHives.Foundation.Threading.Async.Pooled;
@@ -18,7 +20,7 @@ public abstract class AsyncAutoResetEventBaseBenchmark
 {
     protected AsyncAutoResetEvent? _eventPooled;
     protected NitoAsyncEx.AsyncAutoResetEvent? _eventNitoAsync;
-    protected RefImpl.AsyncAutoResetEvent? _eventRefImpl;
+    protected RefImpl.AsyncAutoResetEvent? _eventRefImp;
     protected AutoResetEvent? _eventStandard;
 
     /// <summary>
@@ -30,7 +32,7 @@ public abstract class AsyncAutoResetEventBaseBenchmark
     {
         _eventPooled = new AsyncAutoResetEvent();
         _eventNitoAsync = new NitoAsyncEx.AsyncAutoResetEvent();
-        _eventRefImpl = new RefImpl.AsyncAutoResetEvent();
+        _eventRefImp = new RefImpl.AsyncAutoResetEvent();
         _eventStandard = new AutoResetEvent(false);
     }
 

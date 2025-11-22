@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2025 The Keepers of the CryptoHives
 // SPDX-License-Identifier: MIT
 
+#pragma warning disable CA1051  // Do not declare visible instance fields, benchmarks require fastest access
+
 namespace Threading.Tests.Async.Pooled;
 
 using CryptoHives.Foundation.Threading.Async.Pooled;
@@ -16,13 +18,17 @@ using NitoAsyncEx = Nito.AsyncEx;
 public abstract class AsyncLockBaseBenchmark
 {
 #if NET9_0_OR_GREATER
-    protected readonly System.Threading.Lock Lock = new();
+    protected System.Threading.Lock _lock;
 #endif
-    protected readonly object ObjectLock = new();
-    protected readonly AsyncLock LockPooled = new();
-    protected readonly NitoAsyncEx.AsyncLock LockNitoAsync = new();
-    protected readonly AsyncKeyedLock.AsyncNonKeyedLocker LockNonKeyed = new();
-    protected readonly RefImpl.AsyncLock LockRefImpl = new();
+    protected object _objectLock;
+    protected AsyncLock _lockPooled;
+    protected System.Threading.SemaphoreSlim _semaphoreSlim;
+    protected NitoAsyncEx.AsyncLock _lockNitoAsync;
+    protected AsyncKeyedLock.AsyncNonKeyedLocker _lockNonKeyed;
+    protected RefImpl.AsyncLock _lockRefImp;
+#if !NETFRAMEWORK
+    protected NeoSmart.AsyncLock.AsyncLock _lockNeoSmart;
+#endif
 
     /// <summary>
     /// Global Setup for benchmarks and tests.
@@ -31,6 +37,18 @@ public abstract class AsyncLockBaseBenchmark
     [GlobalSetup]
     public void GlobalSetup()
     {
+#if NET9_0_OR_GREATER
+        _lock = new();
+#endif
+        _objectLock = new();
+        _lockPooled = new();
+        _semaphoreSlim = new(1, 1);
+        _lockNitoAsync = new();
+        _lockNonKeyed = new();
+        _lockRefImp = new();
+#if !NETFRAMEWORK
+        _lockNeoSmart = new();
+#endif
     }
 
     /// <summary>

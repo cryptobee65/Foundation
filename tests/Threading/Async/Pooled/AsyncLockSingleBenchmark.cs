@@ -5,6 +5,7 @@ namespace Threading.Tests.Async.Pooled;
 
 using BenchmarkDotNet.Attributes;
 using NUnit.Framework;
+using System.Threading;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -43,6 +44,20 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
 {
     private volatile int _counter;
 
+
+    /// <summary>
+    /// Benchmark for unchecked increment.
+    /// </summary>
+    /// <remarks>
+    /// Measures the performance of the increment operation.
+    /// </remarks>
+    [Benchmark]
+    public void IncrementSingle()
+    {
+        // simulate work
+        unchecked { _counter++; }
+    }
+
 #if NET9_0_OR_GREATER
     /// <summary>
     /// Benchmark for .NET 9.0 C# Lock statement.
@@ -55,7 +70,7 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark]
     public void LockUnlockSingle()
     {
-        lock (Lock)
+        lock (_lock)
         {
             // simulate work
             unchecked { _counter++; }
@@ -73,7 +88,7 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark]
     public void LockEnterScopeSingle()
     {
-        using (Lock.EnterScope())
+        using (_lock.EnterScope())
         {
             // simulate work
             unchecked { _counter++; }
@@ -92,10 +107,39 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark]
     public void ObjectLockUnlockSingle()
     {
-        lock (ObjectLock)
+        lock (_objectLock)
         {
             // simulate work
             unchecked { _counter++; }
+        }
+    }
+
+    /// <summary>
+    /// Benchmark for Interlocked.Increment vs C# lock statements.
+    /// </summary>
+    [Test]
+    [Benchmark]
+    public void InterlockedIncrementSingle()
+    {
+        Interlocked.Increment(ref _counter);
+    }
+
+    /// <summary>
+    /// Benchmark for SemaphoreSlim used as a lock.
+    /// </summary>
+    [Test]
+    [Benchmark]
+    public async Task LockUnlockSemaphoreSlimSingleAsync()
+    {
+        await _semaphoreSlim.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+        finally
+        {
+            _semaphoreSlim.Release();
         }
     }
 
@@ -110,7 +154,7 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark]
     public async Task LockUnlockPooledSingleAsync()
     {
-        using (await LockPooled.LockAsync().ConfigureAwait(false))
+        using (await _lockPooled.LockAsync().ConfigureAwait(false))
         {
             // simulate work
             unchecked { _counter++; }
@@ -128,7 +172,7 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark]
     public async Task LockUnlockNitoSingleAsync()
     {
-        using (await LockNitoAsync.LockAsync().ConfigureAwait(false))
+        using (await _lockNitoAsync.LockAsync().ConfigureAwait(false))
         {
             // simulate work
             unchecked { _counter++; }
@@ -146,12 +190,31 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark]
     public async Task LockUnlockNonKeyedSingleAsync()
     {
-        using (await LockNonKeyed.LockAsync().ConfigureAwait(false))
+        using (await _lockNonKeyed.LockAsync().ConfigureAwait(false))
         {
             // simulate work
             unchecked { _counter++; }
         }
     }
+
+#if !NETFRAMEWORK
+    /// <summary>
+    /// Benchmark for the NeoSmart AsyncLock implementation.
+    /// </summary>
+    /// <remarks>
+    /// Measures the fast-path performance of the third party NeoSmart implementation.
+    /// </remarks>
+    [Test]
+    [Benchmark]
+    public async Task LockUnlockNeoSmartSingleAsync()
+    {
+        using (await _lockNeoSmart.LockAsync().ConfigureAwait(false))
+        {
+            // simulate work
+            unchecked { _counter++; }
+        }
+    }
+#endif
 
     /// <summary>
     /// Benchmark for reference implementation async lock (single uncontended acquisition, baseline).
@@ -164,7 +227,7 @@ public class AsyncLockSingleBenchmark : AsyncLockBaseBenchmark
     [Benchmark(Baseline = true)]
     public async Task LockUnlockRefImplSingleAsync()
     {
-        using (await LockRefImpl.LockAsync().ConfigureAwait(false))
+        using (await _lockRefImp.LockAsync().ConfigureAwait(false))
         {
             // simulate work
             unchecked { _counter++; }

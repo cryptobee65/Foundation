@@ -23,6 +23,7 @@ public class AsyncLockUnitTests
         using (await vt.ConfigureAwait(false))
         {
             Assert.That(al.IsTaken);
+            Assert.That(vt.IsCompleted);
         }
 
         Assert.That(al.IsTaken, Is.False);
@@ -50,18 +51,17 @@ public class AsyncLockUnitTests
     }
 
     [Test]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1849:Call async methods when in an async method", Justification = "Not available in legacy platforms")]
     public async Task CancellationBeforeQueueingThrowsAsync()
     {
         var al = new AsyncLock();
 
         using (await al.LockAsync().ConfigureAwait(false))
         {
-            using (var cts = new CancellationTokenSource())
-            {
-                cts.Cancel();
-                var exVt = al.LockAsync(cts.Token);
-                Assert.ThrowsAsync<OperationCanceledException>(async () => await exVt.ConfigureAwait(false));
-            }
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var exVt = al.LockAsync(cts.Token);
+            Assert.ThrowsAsync<OperationCanceledException>(async () => await exVt.ConfigureAwait(false));
         }
     }
 }
